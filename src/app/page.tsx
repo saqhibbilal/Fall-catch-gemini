@@ -9,7 +9,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  
+
   // Mocks result for Phase 2 UI testing. Will connect to API in Phase 4.
   const [result, setResult] = useState<{
     fallDetected: boolean;
@@ -22,27 +22,27 @@ export default function Home() {
   const handleFile = (selectedFile: File) => {
     setError(null);
     setResult(null);
-    
+
     if (!selectedFile.type.startsWith("video/")) {
       setError("Please upload a valid video file (MP4, MOV, etc).");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
-    
+
     const url = URL.createObjectURL(selectedFile);
     const video = document.createElement("video");
     video.preload = "metadata";
     video.onloadedmetadata = () => {
-      window.URL.revokeObjectURL(video.src);
       // Validate up to 30.9 seconds to avoid strict float cutoff
       if (video.duration > 31) {
         setError("Video exceeds 30 seconds maximum. Please choose a shorter video.");
         setFile(null);
         setPreviewUrl(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
+        window.URL.revokeObjectURL(url); // Revoke only on rejection
       } else {
         setFile(selectedFile);
-        setPreviewUrl(url);
+        setPreviewUrl(url); // Keep URL alive for preview component
       }
     };
     // Failsafe in case onloadedmetadata fails
@@ -85,22 +85,39 @@ export default function Home() {
     if (!file) return;
     setLoading(true);
     setError(null);
-    
-    // Simulate delay for Phase 2 testing.
-    setTimeout(() => {
-      setLoading(false);
-      setResult({
-        fallDetected: true,
-        confidence: 92.5,
-        explanation: "A person appears to lose their balance and falls to the ground abruptly without catching themselves."
+    setResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("video", file);
+
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        body: formData,
       });
-    }, 2500);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to analyze video");
+      }
+
+      setResult({
+        fallDetected: data.fallDetected,
+        confidence: data.confidence,
+        explanation: data.explanation,
+      });
+    } catch (err: any) {
+      setError(err.message || "An error occurred while analyzing the video.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col items-center py-12 px-4 selection:bg-cyan-500/30">
       <div className="max-w-3xl w-full space-y-8">
-        
+
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="inline-flex items-center justify-center p-3 bg-cyan-900/30 rounded-2xl mb-2 border border-cyan-500/20 shadow-[0_0_30px_rgba(6,182,212,0.15)] glow">
@@ -127,7 +144,7 @@ export default function Home() {
           <div className="p-8">
             {!previewUrl ? (
               /* Upload Zone */
-              <div 
+              <div
                 onDragOver={onDragOver}
                 onDragLeave={onDragLeave}
                 onDrop={onDrop}
@@ -136,17 +153,17 @@ export default function Home() {
                   ${isDragging ? 'border-cyan-500 bg-cyan-500/5' : 'border-neutral-700 hover:border-cyan-500/50 hover:bg-neutral-800/50'}
                 `}
               >
-                <input 
-                  type="file" 
+                <input
+                  type="file"
                   ref={fileInputRef}
-                  className="hidden" 
+                  className="hidden"
                   accept="video/*"
                   onChange={(e) => {
                     if (e.target.files?.[0]) handleFile(e.target.files[0]);
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-b from-cyan-500/0 via-cyan-500/0 to-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
-                
+
                 <div className="p-4 bg-neutral-800 rounded-full mb-4 shadow-xl group-hover:scale-110 transition-transform duration-300 ring-4 ring-neutral-900">
                   <Upload className="w-8 h-8 text-cyan-400" />
                 </div>
@@ -167,7 +184,7 @@ export default function Home() {
                     <Video className="w-4 h-4 text-cyan-400" />
                     Video Preview
                   </h3>
-                  <button 
+                  <button
                     onClick={clearSelection}
                     className="text-sm text-neutral-400 hover:text-white flex items-center gap-1.5 transition-colors p-1"
                   >
@@ -175,11 +192,11 @@ export default function Home() {
                     Clear selection
                   </button>
                 </div>
-                
+
                 <div className="relative rounded-2xl overflow-hidden bg-black border border-neutral-800 shadow-xl aspect-video group">
-                  <video 
-                    src={previewUrl} 
-                    controls 
+                  <video
+                    src={previewUrl}
+                    controls
                     className="w-full h-full object-contain"
                   />
                   {!result && !loading && (

@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
         }
 
         // 3. Prompt the model
-        // Using flash model as it excels at quick multimodal tasks
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // Trying gemini-3-flash-preview as requested
+        const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
         const prompt = `Analyze this video carefully. Determine if a person has accidentally fallen down in the video.
 Return exclusively a JSON object with nothing else, adhering to this structure exactly:
 {
